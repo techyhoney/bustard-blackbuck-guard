@@ -59,6 +59,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           <NavLink
             key={item.path}
             to={item.path}
+            end
             onClick={() => setMobileOpen(false)}
             className={({ isActive }) =>
               cn(
@@ -96,14 +97,15 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       {/* Desktop Sidebar */}
       <aside
         className={cn(
-          "hidden md:flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300",
+          "hidden md:flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 relative",
           collapsed ? "w-20" : "w-64"
         )}
       >
         <NavContent />
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute top-20 -right-3 w-6 h-6 bg-sidebar-accent border border-sidebar-border rounded-full flex items-center justify-center hover:bg-sidebar-accent/80 transition-colors"
+          className="absolute top-20 -right-3 w-6 h-6 bg-sidebar-accent border border-sidebar-border rounded-full flex items-center justify-center hover:bg-sidebar-accent/80 transition-colors z-10"
+          style={{ position: 'absolute' }}
         >
           {collapsed ? (
             <ChevronRight className="w-4 h-4 text-sidebar-foreground" />
