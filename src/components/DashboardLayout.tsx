@@ -2,6 +2,7 @@ import { ReactNode, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Bird,
   LayoutDashboard,
@@ -20,10 +21,12 @@ interface DashboardLayoutProps {
 
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const navigate = useNavigate();
+  const { signOut, user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     navigate("/");
   };
 
@@ -148,16 +151,23 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-16 border-b bg-card flex items-center px-4 md:px-6">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="md:hidden mr-4 text-foreground"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          <h1 className="text-xl font-semibold text-foreground">
-            Wildlife Conservation Dashboard
-          </h1>
+        <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-6">
+          <div className="flex items-center">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="md:hidden mr-4 text-foreground"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <h1 className="text-xl font-semibold text-foreground">
+              Wildlife Conservation Dashboard
+            </h1>
+          </div>
+          {user && (
+            <div className="text-sm text-muted-foreground">
+              {user.email}
+            </div>
+          )}
         </header>
 
         {/* Page Content */}

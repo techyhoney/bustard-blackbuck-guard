@@ -1,32 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bird, AlertCircle } from "lucide-react";
-import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { signIn, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
 
-    // Simulate login - in real app this would call an API
-    setTimeout(() => {
-      if (email && password) {
-        toast.success("Login successful!");
-        navigate("/dashboard");
-      } else {
-        toast.error("Please enter both email and password");
-      }
-      setIsLoading(false);
-    }, 1000);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email || !password) {
+      return;
+    }
+
+    setIsLoading(true);
+    const { error } = await signIn(email, password);
+    
+    if (!error) {
+      navigate("/dashboard");
+    }
+    
+    setIsLoading(false);
   };
 
   return (
@@ -69,7 +78,7 @@ const Login = () => {
             <div className="bg-muted p-3 rounded-lg flex gap-2 text-sm">
               <AlertCircle className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
               <p className="text-muted-foreground">
-                Demo: Use any email and password to login
+                Sign in with your registered email and password
               </p>
             </div>
           </form>
