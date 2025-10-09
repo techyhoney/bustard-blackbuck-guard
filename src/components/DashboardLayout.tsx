@@ -14,6 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Trees,
+  AlertTriangle,
+  UsersRound,
 } from "lucide-react";
 
 interface DashboardLayoutProps {
@@ -35,6 +37,8 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: FileText, label: "Survey Entries", path: "/dashboard/surveys" },
     { icon: Trees, label: "Habitat Assessments", path: "/dashboard/habitat-assessments" },
+    { icon: AlertTriangle, label: "Threat Documentations", path: "/dashboard/threat-documentations" },
+    { icon: UsersRound, label: "Conservation & Community", path: "/dashboard/conservation-community" },
     { icon: Users, label: "User Management", path: "/dashboard/users" },
   ];
 

@@ -9,6 +9,8 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Surveys from "./pages/Surveys";
 import HabitatAssessments from "./pages/HabitatAssessments";
+import ThreatDocumentations from "./pages/ThreatDocumentations";
+import ConservationCommunityInteractions from "./pages/ConservationCommunityInteractions";
 import Users from "./pages/Users";
 import DashboardLayout from "./components/DashboardLayout";
 import NotFound from "./pages/NotFound";
@@ -50,6 +52,26 @@ const App = () => (
                 <ProtectedRoute>
                   <DashboardLayout>
                     <HabitatAssessments />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/threat-documentations"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <ThreatDocumentations />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/conservation-community"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <ConservationCommunityInteractions />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
