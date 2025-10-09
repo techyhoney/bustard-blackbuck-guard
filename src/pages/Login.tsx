@@ -1,39 +1,32 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bird, AlertCircle, Shield } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { Bird, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { signIn, user, isAdmin } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already logged in and is admin
-  useEffect(() => {
-    if (user && isAdmin) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [user, isAdmin, navigate]);
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      await signIn(email, password);
-      navigate("/dashboard");
-    } catch (error) {
-      // Error is already handled in the signIn function
-      console.error('Login error:', error);
-    } finally {
+    // Simulate login - in real app this would call an API
+    setTimeout(() => {
+      if (email && password) {
+        toast.success("Login successful!");
+        navigate("/dashboard");
+      } else {
+        toast.error("Please enter both email and password");
+      }
       setIsLoading(false);
-    }
+    }, 1000);
   };
 
   return (
@@ -74,9 +67,9 @@ const Login = () => {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
             <div className="bg-muted p-3 rounded-lg flex gap-2 text-sm">
-              <Shield className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              <AlertCircle className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
               <p className="text-muted-foreground">
-                Admin access only. Please use your authorized credentials.
+                Demo: Use any email and password to login
               </p>
             </div>
           </form>

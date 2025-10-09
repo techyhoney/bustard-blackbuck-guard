@@ -32,28 +32,9 @@ cd <YOUR_PROJECT_NAME>
 # Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Set up your environment variables
-# Create a .env file and add your Supabase credentials
-# See SUPABASE_SETUP.md for detailed instructions
-cp .env.template .env
-# Then edit .env with your Supabase URL and anon key
-
-# Step 5: Start the development server with auto-reloading and an instant preview.
+# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
-
-## Authentication Setup
-
-This application uses **Supabase Authentication** with admin-only access control.
-
-**Important:** Before running the application, you need to:
-
-1. Set up a Supabase project
-2. Configure environment variables
-3. Set up the user_profile table in your database
-4. Create at least one admin user
-
-📖 **For detailed setup instructions, see [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)**
 
 **Edit a file directly in GitHub**
 
@@ -78,9 +59,6 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
-- Supabase (Authentication & Database)
-- React Router
-- TanStack Query
 
 ## How can I deploy this project?
 
