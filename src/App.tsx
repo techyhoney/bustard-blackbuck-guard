@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Surveys from "./pages/Surveys";
+import HabitatAssessments from "./pages/HabitatAssessments";
 import Users from "./pages/Users";
 import DashboardLayout from "./components/DashboardLayout";
 import NotFound from "./pages/NotFound";
@@ -39,6 +40,16 @@ const App = () => (
                 <ProtectedRoute>
                   <DashboardLayout>
                     <Surveys />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/habitat-assessments"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <HabitatAssessments />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

@@ -49,12 +49,13 @@ interface SurveyEntry {
 
 const Surveys = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSpecies, setSelectedSpecies] = useState<string>("all");
-  const [selectedObserverType, setSelectedObserverType] = useState<string>("all");
   const [selectedEntry, setSelectedEntry] = useState<SurveyEntry | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [surveyEntries, setSurveyEntries] = useState<SurveyEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   // Fetch survey entries from Supabase
   useEffect(() => {
@@ -159,18 +160,8 @@ const Surveys = () => {
       entry.observer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       entry.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (entry.creature && entry.creature.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    // Match species - handle both "Bustard" and "Great Indian Bustard"
-    const matchesSpecies =
-      selectedSpecies === "all" || 
-      entry.creature === selectedSpecies ||
-      (selectedSpecies === "Great Indian Bustard" && (entry.creature === "Bustard" || entry.creature === "Great Indian Bustard"));
-    
-    const matchesType =
-      selectedObserverType === "all" || 
-      entry.role?.toLowerCase() === selectedObserverType.toLowerCase();
-    
-    return matchesSearch && matchesSpecies && matchesType;
+
+    return matchesSearch;
   });
 
   // Filter entries for tabs - handle both "Bustard" and "Great Indian Bustard"
@@ -180,6 +171,9 @@ const Surveys = () => {
   const blackbuckEntries = filteredEntries.filter(
     (e) => e.creature === "Blackbuck"
   );
+  const otherEntries = filteredEntries.filter(
+    (e) => e.creature === "Other"
+  );
 
   const handleView = (entry: SurveyEntry) => {
     setSelectedEntry(entry);
@@ -187,11 +181,91 @@ const Surveys = () => {
   };
 
   const handleEdit = (entry: SurveyEntry) => {
-    toast.info(`Edit functionality for ${entry.id} - UI Demo`);
+    setSelectedEntry(entry);
+    setEditModalOpen(true);
   };
 
-  const handleDelete = (entry: SurveyEntry) => {
-    toast.error(`Delete ${entry.id}? - UI Demo`);
+  const handleDeleteClick = (entry: SurveyEntry) => {
+    setSelectedEntry(entry);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedEntry) return;
+
+    try {
+      setDeleting(true);
+
+      // Delete the entry from the database
+      const { error } = await supabase
+        .from('locations')
+        .delete()
+        .eq('id', selectedEntry.id);
+
+      if (error) {
+        console.error('Delete error:', error);
+        toast.error('Failed to delete entry: ' + error.message);
+        return;
+      }
+
+      // Remove from local state
+      setSurveyEntries((prev) => prev.filter((e) => e.id !== selectedEntry.id));
+
+      toast.success('Survey entry deleted successfully');
+      setDeleteDialogOpen(false);
+      setSelectedEntry(null);
+    } catch (error: any) {
+      console.error('Error deleting entry:', error);
+      toast.error('Failed to delete entry: ' + error.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleUpdateEntry = async (updatedData: Partial<SurveyEntry>) => {
+    if (!selectedEntry) return;
+
+    try {
+      // Update the entry in the database
+      const { error } = await supabase
+        .from('locations')
+        .update({
+          location: updatedData.location,
+          type: updatedData.type,
+          number_of_birds_sighted: updatedData.number_of_birds_sighted,
+          sex_age: updatedData.sex_age,
+          behaviour_observed: updatedData.behaviour_observed,
+          duration_of_observation: updatedData.duration_of_observation,
+          bird_movement_direction: updatedData.bird_movement_direction,
+          other_behaviour_details: updatedData.other_behaviour_details,
+        })
+        .eq('id', selectedEntry.id);
+
+      if (error) {
+        console.error('Update error:', error);
+        toast.error('Failed to update entry: ' + error.message);
+        return;
+      }
+
+      // Update local state
+      setSurveyEntries((prev) =>
+        prev.map((entry) =>
+          entry.id === selectedEntry.id
+            ? { ...entry, ...updatedData }
+            : entry
+        )
+      );
+
+      toast.success('Survey entry updated successfully');
+      setEditModalOpen(false);
+      setSelectedEntry(null);
+      
+      // Refresh data to get latest from database
+      fetchSurveyEntries();
+    } catch (error: any) {
+      console.error('Error updating entry:', error);
+      toast.error('Failed to update entry: ' + error.message);
+    }
   };
 
   const formatDateTime = (dateString: string) => {
@@ -247,8 +321,8 @@ const Surveys = () => {
             <TableHead>Location</TableHead>
             <TableHead>Observer Name</TableHead>
             <TableHead>Role</TableHead>
-            <TableHead>Type</TableHead>
-            {creatureType !== 'Blackbuck' && (
+            {creatureType !== 'Other' && <TableHead>Type</TableHead>}
+            {creatureType !== 'Blackbuck' && creatureType !== 'Other' && (
               <>
                 <TableHead>Birds Sighted</TableHead>
                 <TableHead>Sex/Age</TableHead>
@@ -302,10 +376,12 @@ const Surveys = () => {
                   {entry.role}
                 </Badge>
               </TableCell>
-              <TableCell>
-                <Badge variant="secondary">{entry.type}</Badge>
-              </TableCell>
-              {creatureType !== 'Blackbuck' && (
+              {creatureType !== 'Other' && (
+                <TableCell>
+                  <Badge variant="secondary">{entry.type}</Badge>
+                </TableCell>
+              )}
+              {creatureType !== 'Blackbuck' && creatureType !== 'Other' && (
                 <>
                   <TableCell className="text-center">
                     {entry.number_of_birds_sighted ?? '-'}
@@ -344,7 +420,7 @@ const Surveys = () => {
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => handleDelete(entry)}
+                    onClick={() => handleDeleteClick(entry)}
                   >
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
@@ -366,50 +442,17 @@ const Surveys = () => {
         </p>
       </div>
 
-      {/* Filters */}
+      {/* Search */}
       <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, ID, or location..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={selectedSpecies} onValueChange={setSelectedSpecies}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Species" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Species</SelectItem>
-                <SelectItem value="Great Indian Bustard">
-                  Great Indian Bustard
-                </SelectItem>
-                <SelectItem value="Bustard">Bustard</SelectItem>
-                <SelectItem value="Blackbuck">Blackbuck</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={selectedObserverType}
-              onValueChange={setSelectedObserverType}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Observer Role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="ranger">Ranger</SelectItem>
-                <SelectItem value="officer">Officer</SelectItem>
-                <SelectItem value="staff">Staff</SelectItem>
-              </SelectContent>
-            </Select>
+        <CardContent className="pt-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, location, or creature..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
           </div>
         </CardContent>
       </Card>
@@ -422,6 +465,9 @@ const Surveys = () => {
           </TabsTrigger>
           <TabsTrigger value="blackbuck">
             Blackbuck ({blackbuckEntries.length})
+          </TabsTrigger>
+          <TabsTrigger value="others">
+            Others ({otherEntries.length})
           </TabsTrigger>
         </TabsList>
 
@@ -437,6 +483,14 @@ const Surveys = () => {
           <Card>
             <CardContent className="pt-6">
               <EntryTable entries={blackbuckEntries} creatureType="Blackbuck" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="others">
+          <Card>
+            <CardContent className="pt-6">
+              <EntryTable entries={otherEntries} creatureType="Other" />
             </CardContent>
           </Card>
         </TabsContent>
@@ -482,19 +536,21 @@ const Surveys = () => {
                     {selectedEntry.role}
                   </Badge>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Type</p>
-                  <Badge variant="secondary" className="mt-1">
-                    {selectedEntry.type}
-                  </Badge>
-                </div>
+                {selectedEntry.creature !== 'Other' && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Type</p>
+                    <Badge variant="secondary" className="mt-1">
+                      {selectedEntry.type}
+                    </Badge>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-muted-foreground">Location</p>
                   <p className="font-medium">{selectedEntry.location}</p>
                 </div>
               </div>
 
-              {/* Show image for both GIB and Blackbuck */}
+              {/* Show image for all creatures */}
               {selectedEntry.image_url && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Image</p>
@@ -514,7 +570,7 @@ const Surveys = () => {
                 </div>
               )}
 
-              {selectedEntry.creature !== 'Blackbuck' && (
+              {selectedEntry.creature !== 'Blackbuck' && selectedEntry.creature !== 'Other' && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -568,7 +624,261 @@ const Surveys = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Survey Entry</DialogTitle>
+            <DialogDescription>
+              Entry #{selectedEntry?.id} - {selectedEntry?.creature}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEntry && <EditForm entry={selectedEntry} onSave={handleUpdateEntry} onCancel={() => setEditModalOpen(false)} />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Survey Entry</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this survey entry? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedEntry && (
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm">
+                  <span className="font-semibold">Entry #:</span> {selectedEntry.id}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Creature:</span> {selectedEntry.creature}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Location:</span> {selectedEntry.location}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Observer:</span> {selectedEntry.observer_name}
+                </p>
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete Entry'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+};
+
+// Edit Form Component
+const EditForm = ({ 
+  entry, 
+  onSave, 
+  onCancel 
+}: { 
+  entry: SurveyEntry; 
+  onSave: (data: Partial<SurveyEntry>) => void; 
+  onCancel: () => void;
+}) => {
+  const [formData, setFormData] = useState({
+    location: entry.location,
+    type: entry.type,
+    number_of_birds_sighted: entry.number_of_birds_sighted || null,
+    sex_age: entry.sex_age || '',
+    behaviour_observed: entry.behaviour_observed || [],
+    duration_of_observation: entry.duration_of_observation || 0,
+    bird_movement_direction: entry.bird_movement_direction || '',
+    other_behaviour_details: entry.other_behaviour_details || '',
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  const toggleBehaviour = (behaviour: string) => {
+    const current = formData.behaviour_observed || [];
+    if (current.includes(behaviour)) {
+      setFormData({ ...formData, behaviour_observed: current.filter(b => b !== behaviour) });
+    } else {
+      setFormData({ ...formData, behaviour_observed: [...current, behaviour] });
+    }
+  };
+
+  // Type options based on creature
+  const typeOptions = entry.creature === 'Blackbuck' || entry.creature === 'Other'
+    ? ['Direct sighting', 'Indirect sighting']
+    : ['Direct sighting', 'Eggs', 'Footprints'];
+
+  const behaviourOptions = [
+    'Feeding',
+    'Walking/Running',
+    'Flying',
+    'Courtship display',
+    'Nesting',
+    'Chick sighted',
+    'Resting',
+    'Incubating',
+    'Other'
+  ];
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-sm font-medium">Location</label>
+          <Input
+            value={formData.location}
+            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            required
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Type</label>
+          <Select 
+            value={formData.type} 
+            onValueChange={(value) => setFormData({ ...formData, type: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select type" />
+            </SelectTrigger>
+            <SelectContent>
+              {typeOptions.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {entry.creature !== 'Blackbuck' && entry.creature !== 'Other' && (
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">Birds Sighted</label>
+              <Select 
+                value={formData.number_of_birds_sighted?.toString() || ''} 
+                onValueChange={(value) => setFormData({ ...formData, number_of_birds_sighted: parseInt(value) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select number" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1</SelectItem>
+                  <SelectItem value="2">2</SelectItem>
+                  <SelectItem value="3">3</SelectItem>
+                  <SelectItem value="4">4</SelectItem>
+                  <SelectItem value="5">5</SelectItem>
+                  <SelectItem value="6">More than 5</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Sex/Age</label>
+              <Select 
+                value={formData.sex_age} 
+                onValueChange={(value) => setFormData({ ...formData, sex_age: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select sex/age" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Adult Male">Adult Male</SelectItem>
+                  <SelectItem value="Adult Female">Adult Female</SelectItem>
+                  <SelectItem value="Juvenile">Juvenile</SelectItem>
+                  <SelectItem value="Unknown">Unknown</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Behaviour Observed</label>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              {behaviourOptions.map((behaviour) => (
+                <div key={behaviour} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id={`behaviour-${behaviour}`}
+                    checked={formData.behaviour_observed?.includes(behaviour) || false}
+                    onChange={() => toggleBehaviour(behaviour)}
+                    className="w-4 h-4 rounded border-gray-300"
+                  />
+                  <label htmlFor={`behaviour-${behaviour}`} className="text-sm">
+                    {behaviour}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">Duration (minutes)</label>
+              <Input
+                type="number"
+                value={formData.duration_of_observation}
+                onChange={(e) => setFormData({ ...formData, duration_of_observation: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Bird Movement Direction</label>
+              <Select 
+                value={formData.bird_movement_direction} 
+                onValueChange={(value) => setFormData({ ...formData, bird_movement_direction: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select direction" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="N">N (North)</SelectItem>
+                  <SelectItem value="E">E (East)</SelectItem>
+                  <SelectItem value="S">S (South)</SelectItem>
+                  <SelectItem value="W">W (West)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Other Behaviour Details</label>
+            <Input
+              value={formData.other_behaviour_details}
+              onChange={(e) => setFormData({ ...formData, other_behaviour_details: e.target.value })}
+              placeholder="Additional observations..."
+            />
+          </div>
+        </>
+      )}
+
+      <div className="flex justify-end gap-3">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">
+          Save Changes
+        </Button>
+      </div>
+    </form>
   );
 };
 
