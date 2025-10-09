@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Bird,
   LayoutDashboard,
   FileText,
   Users,
@@ -17,6 +16,7 @@ import {
   AlertTriangle,
   UsersRound,
 } from "lucide-react";
+import birdLogo from "@/images/bird.png";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -47,18 +47,18 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Bird className="w-6 h-6 text-primary-foreground" />
+            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1">
+              <img src={birdLogo} alt="GIMP-S Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
-              <span className="font-semibold text-sidebar-foreground text-sm">Wildlife</span>
-              <span className="text-xs text-sidebar-foreground/70">Admin Portal</span>
+              <span className="font-semibold text-sidebar-foreground text-sm">GIMP-S</span>
+              <span className="text-xs text-sidebar-foreground/70">Siruguppa</span>
             </div>
           </div>
         )}
         {collapsed && (
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center mx-auto">
-            <Bird className="w-6 h-6 text-primary-foreground" />
+          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center mx-auto p-1">
+            <img src={birdLogo} alt="GIMP-S Logo" className="w-full h-full object-contain" />
           </div>
         )}
       </div>
@@ -134,12 +134,12 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
             <div className="p-4 flex justify-between items-center border-b border-sidebar-border">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                  <Bird className="w-6 h-6 text-primary-foreground" />
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1">
+                  <img src={birdLogo} alt="GIMP-S Logo" className="w-full h-full object-contain" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-semibold text-sidebar-foreground text-sm">Wildlife</span>
-                  <span className="text-xs text-sidebar-foreground/70">Admin Portal</span>
+                  <span className="font-semibold text-sidebar-foreground text-sm">GIMP-S</span>
+                  <span className="text-xs text-sidebar-foreground/70">Siruguppa</span>
                 </div>
               </div>
               <button
@@ -166,7 +166,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
               <Menu className="w-6 h-6" />
             </button>
             <h1 className="text-xl font-semibold text-foreground">
-              Wildlife Conservation Dashboard
+              GIMP-S Dashboard
             </h1>
           </div>
           {user && (

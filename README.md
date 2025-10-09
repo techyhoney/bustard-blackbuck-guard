@@ -1,8 +1,8 @@
-# Welcome to your Lovable project
+# GIMP-S - GIBs Inventory Monitoring and Patrolling System
 
-## Project info
+**GIBs Inventory Monitoring and Patrolling - Siruguppa**
 
-**URL**: https://lovable.dev/projects/4ff9e63d-c149-47a5-a5e1-76da517761e8
+A comprehensive wildlife conservation management system for tracking Great Indian Bustard, Blackbuck, and other species in the Siruguppa region.
 
 ## How can I edit this code?
 
@@ -62,12 +62,56 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/4ff9e63d-c149-47a5-a5e1-76da517761e8) and click on Share -> Publish.
+### Deploy to Netlify
 
-## Can I connect a custom domain to my Lovable project?
+This project is configured for easy deployment to Netlify.
 
-Yes, you can!
+**Option 1: Deploy via Netlify CLI**
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+1. Install Netlify CLI:
+   ```sh
+   npm install -g netlify-cli
+   ```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+2. Login to Netlify:
+   ```sh
+   netlify login
+   ```
+
+3. Deploy:
+   ```sh
+   netlify deploy --prod
+   ```
+
+**Option 2: Deploy via Netlify Dashboard**
+
+1. Push your code to GitHub
+2. Go to [Netlify](https://app.netlify.com/)
+3. Click "Add new site" → "Import an existing project"
+4. Connect your GitHub repository
+5. Netlify will automatically detect the build settings from `netlify.toml`
+6. Add environment variables in Netlify dashboard:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+7. Click "Deploy site"
+
+**Option 3: One-Click Deploy**
+
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start)
+
+### Environment Variables
+
+Make sure to set the following environment variables in your Netlify dashboard:
+
+- `VITE_SUPABASE_URL` - Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+
+## Features
+
+- 🦅 **Wildlife Survey Management** - Track Great Indian Bustard, Blackbuck, and other species
+- 🌳 **Habitat Assessments** - Monitor and document habitat conditions
+- ⚠️ **Threat Documentation** - Record and track conservation threats
+- 👥 **Community Interaction** - Log conservation awareness activities
+- 📊 **Dynamic Dashboard** - Real-time statistics and analytics
+- 🔐 **User Management** - Role-based access control
+- 📸 **Image Management** - Secure storage and signed URLs for wildlife photos

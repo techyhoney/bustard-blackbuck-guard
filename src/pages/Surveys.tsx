@@ -29,6 +29,8 @@ import {
 import { Search, Eye, Edit, Trash2, MapPin, Calendar, User } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import birdLogo from "@/images/bird.png";
+import animalLogo from "@/images/animal.png";
 
 interface SurveyEntry {
   id: number;
@@ -460,13 +462,15 @@ const Surveys = () => {
       {/* Tabs */}
       <Tabs defaultValue="gib" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="gib">
+          <TabsTrigger value="gib" className="flex items-center gap-2">
+            <img src={birdLogo} alt="Bird" className="w-5 h-5 object-contain" />
             Great Indian Bustard ({gibEntries.length})
           </TabsTrigger>
-          <TabsTrigger value="blackbuck">
+          <TabsTrigger value="blackbuck" className="flex items-center gap-2">
+            <img src={animalLogo} alt="Animal" className="w-5 h-5 object-contain" />
             Blackbuck ({blackbuckEntries.length})
           </TabsTrigger>
-          <TabsTrigger value="others">
+          <TabsTrigger value="others" className="flex items-center gap-2">
             Others ({otherEntries.length})
           </TabsTrigger>
         </TabsList>

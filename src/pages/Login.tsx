@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bird, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import birdLogo from "@/images/bird.png";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -42,11 +43,13 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center">
-            <Bird className="w-8 h-8 text-primary-foreground" />
+          <div className="mx-auto w-16 h-16 bg-white rounded-full flex items-center justify-center p-2">
+            <img src={birdLogo} alt="GIMP-S Logo" className="w-full h-full object-contain" />
           </div>
-          <CardTitle className="text-3xl font-bold">Wildlife Survey Admin</CardTitle>
-          <CardDescription>Sign in to access the admin dashboard</CardDescription>
+          <CardTitle className="text-3xl font-bold">GIMP-S</CardTitle>
+          <CardDescription className="text-base">
+            GIBs Inventory Monitoring and Patrolling - Siruguppa
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
