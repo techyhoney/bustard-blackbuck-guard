@@ -113,7 +113,7 @@ const Dashboard = () => {
       console.log("Fetched users:", users); // Debug log
 
       // Calculate survey stats
-      const gibCount = (locations || []).filter(l => l.creature === 'Great Indian Bustard').length;
+      const gibCount = (locations || []).filter(l => l.creature === 'Great Indian Bustard' || l.creature === 'Bustard').length;
       const blackbuckCount = (locations || []).filter(l => l.creature === 'Blackbuck').length;
       const otherCount = (locations || []).filter(l => l.creature === 'Other').length;
       const totalSurveys = (locations || []).length;

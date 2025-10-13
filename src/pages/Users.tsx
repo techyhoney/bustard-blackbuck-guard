@@ -165,42 +165,23 @@ const Users = () => {
 
   const handleCreateUser = async (formData: any) => {
     try {
-      // Create user in auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: formData.email,
-        password: formData.password,
-        email_confirm: true, // Auto-confirm email
+      // Call the RPC function to create user with profile
+      const { data, error } = await supabase.rpc('create_user_with_profile', {
+        p_email: formData.email,
+        p_password: formData.password,
+        p_name_of_official: formData.name,
+        p_role: formData.role,
+        p_employee_id: formData.employeeId || null,
+        p_beat_number: formData.beatNumber ? parseInt(formData.beatNumber) : null,
+        p_range_forest_office: formData.rangeForestOffice || null,
+        p_division: formData.division || null,
+        p_latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+        p_longitude: formData.longitude ? parseFloat(formData.longitude) : null,
       });
 
-      if (authError) {
-        console.error('Create user error:', authError);
-        toast.error('Failed to create user: ' + authError.message);
-        return;
-      }
-
-      if (!authData.user) {
-        toast.error('Failed to create user');
-        return;
-      }
-
-      // Create user profile
-      const { error: profileError } = await supabase
-        .from('user_profile')
-        .insert({
-          id: authData.user.id,
-          name_of_official: formData.name,
-          role: formData.role,
-          employee_id: formData.employeeId || null,
-          beat_number: formData.beatNumber ? parseInt(formData.beatNumber) : null,
-          range_forest_office: formData.rangeForestOffice || null,
-          division: formData.division || null,
-          latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-          longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-        });
-
-      if (profileError) {
-        console.error('Create profile error:', profileError);
-        toast.error('User created but profile failed: ' + profileError.message);
+      if (error) {
+        console.error('Create user error:', error);
+        toast.error('Failed to create user: ' + error.message);
         return;
       }
 
