@@ -54,6 +54,20 @@ interface SurveyEntry {
   other_behaviour_details: string | null;
   creature: string;
   image_url: string | null;
+  patrol_id: string | null;
+}
+
+interface PatrolEntry {
+  id: string;
+  user_id: string;
+  start_time: string;
+  end_time: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  observer_name: string;
+  role: string;
+  location_count: number;
 }
 
 const Surveys = () => {
@@ -67,10 +81,19 @@ const Surveys = () => {
   const [deleting, setDeleting] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  
+  // Patrol states
+  const [selectedPatrol, setSelectedPatrol] = useState<PatrolEntry | null>(null);
+  const [viewPatrolModalOpen, setViewPatrolModalOpen] = useState(false);
+  const [editPatrolModalOpen, setEditPatrolModalOpen] = useState(false);
+  const [deletePatrolDialogOpen, setDeletePatrolDialogOpen] = useState(false);
+  const [patrolEntries, setPatrolEntries] = useState<PatrolEntry[]>([]);
+  const [loadingPatrols, setLoadingPatrols] = useState(true);
 
   // Fetch survey entries from Supabase
   useEffect(() => {
     fetchSurveyEntries();
+    fetchPatrolEntries();
   }, []);
 
   const fetchSurveyEntries = async () => {
@@ -153,6 +176,7 @@ const Surveys = () => {
             other_behaviour_details: location.other_behaviour_details,
             creature: location.creature,
             image_url: imageUrl,
+            patrol_id: location.patrol_id,
           };
         })
       );
@@ -163,6 +187,65 @@ const Surveys = () => {
       console.error("Error fetching survey entries:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPatrolEntries = async () => {
+    try {
+      setLoadingPatrols(true);
+      
+      // Fetch patrols data with joined user profile information
+      const { data: patrolsData, error: patrolsError } = await supabase
+        .from('patrols')
+        .select(`
+          *,
+          user_profile:user_id (
+            id,
+            name_of_official,
+            role
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (patrolsError) {
+        console.error("Patrols fetch error:", patrolsError);
+        toast.error("Failed to fetch patrol entries: " + patrolsError.message);
+        setLoadingPatrols(false);
+        return;
+      }
+
+      // Transform the data and count associated locations
+      const transformedData: PatrolEntry[] = await Promise.all(
+        (patrolsData || []).map(async (patrol: any) => {
+          const userProfile = patrol.user_profile;
+          
+          // Count locations associated with this patrol
+          const { count } = await supabase
+            .from('locations')
+            .select('*', { count: 'exact', head: true })
+            .eq('patrol_id', patrol.id);
+          
+          return {
+            id: patrol.id,
+            user_id: patrol.user_id,
+            start_time: patrol.start_time,
+            end_time: patrol.end_time,
+            status: patrol.status,
+            created_at: patrol.created_at,
+            updated_at: patrol.updated_at,
+            observer_name: userProfile?.name_of_official || 'Unknown Observer',
+            role: userProfile?.role || 'Unknown Role',
+            location_count: count || 0,
+          };
+        })
+      );
+
+      setPatrolEntries(transformedData);
+    } catch (error: any) {
+      toast.error("Failed to fetch patrol entries: " + error.message);
+      console.error("Error fetching patrol entries:", error);
+    } finally {
+      setLoadingPatrols(false);
     }
   };
 
@@ -190,6 +273,20 @@ const Surveys = () => {
   const otherEntries = filteredEntries.filter(
     (e) => e.creature === "Other"
   );
+
+  // Filter patrol entries
+  const filteredPatrolEntries = patrolEntries.filter((patrol) => {
+    const matchesSearch =
+      patrol.observer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patrol.status.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Date filtering
+    const patrolDate = new Date(patrol.start_time);
+    const matchesDateFrom = !dateFrom || patrolDate >= dateFrom;
+    const matchesDateTo = !dateTo || patrolDate <= new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate(), 23, 59, 59);
+
+    return matchesSearch && matchesDateFrom && matchesDateTo;
+  });
 
   const handleView = (entry: SurveyEntry) => {
     setSelectedEntry(entry);
@@ -281,6 +378,95 @@ const Surveys = () => {
     } catch (error: any) {
       console.error('Error updating entry:', error);
       toast.error('Failed to update entry: ' + error.message);
+    }
+  };
+
+  // Patrol handlers
+  const handleViewPatrol = (patrol: PatrolEntry) => {
+    setSelectedPatrol(patrol);
+    setViewPatrolModalOpen(true);
+  };
+
+  const handleEditPatrol = (patrol: PatrolEntry) => {
+    setSelectedPatrol(patrol);
+    setEditPatrolModalOpen(true);
+  };
+
+  const handleDeletePatrolClick = (patrol: PatrolEntry) => {
+    setSelectedPatrol(patrol);
+    setDeletePatrolDialogOpen(true);
+  };
+
+  const handleDeletePatrolConfirm = async () => {
+    if (!selectedPatrol) return;
+
+    try {
+      setDeleting(true);
+
+      // Delete the patrol from the database
+      const { error } = await supabase
+        .from('patrols')
+        .delete()
+        .eq('id', selectedPatrol.id);
+
+      if (error) {
+        console.error('Delete error:', error);
+        toast.error('Failed to delete patrol: ' + error.message);
+        return;
+      }
+
+      // Remove from local state
+      setPatrolEntries((prev) => prev.filter((p) => p.id !== selectedPatrol.id));
+
+      toast.success('Patrol entry deleted successfully');
+      setDeletePatrolDialogOpen(false);
+      setSelectedPatrol(null);
+    } catch (error: any) {
+      console.error('Error deleting patrol:', error);
+      toast.error('Failed to delete patrol: ' + error.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleUpdatePatrol = async (updatedData: Partial<PatrolEntry>) => {
+    if (!selectedPatrol) return;
+
+    try {
+      // Update the patrol in the database
+      const { error } = await supabase
+        .from('patrols')
+        .update({
+          start_time: updatedData.start_time,
+          end_time: updatedData.end_time,
+          status: updatedData.status,
+        })
+        .eq('id', selectedPatrol.id);
+
+      if (error) {
+        console.error('Update error:', error);
+        toast.error('Failed to update patrol: ' + error.message);
+        return;
+      }
+
+      // Update local state
+      setPatrolEntries((prev) =>
+        prev.map((patrol) =>
+          patrol.id === selectedPatrol.id
+            ? { ...patrol, ...updatedData }
+            : patrol
+        )
+      );
+
+      toast.success('Patrol entry updated successfully');
+      setEditPatrolModalOpen(false);
+      setSelectedPatrol(null);
+      
+      // Refresh data to get latest from database
+      fetchPatrolEntries();
+    } catch (error: any) {
+      console.error('Error updating patrol:', error);
+      toast.error('Failed to update patrol: ' + error.message);
     }
   };
 
@@ -536,6 +722,10 @@ const Surveys = () => {
           <TabsTrigger value="others" className="flex items-center gap-2">
             Others ({otherEntries.length})
           </TabsTrigger>
+          <TabsTrigger value="patrols" className="flex items-center gap-2">
+            <MapPin className="w-4 h-4" />
+            Patrols ({filteredPatrolEntries.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="gib">
@@ -558,6 +748,20 @@ const Surveys = () => {
           <Card>
             <CardContent className="pt-6">
               <EntryTable entries={otherEntries} creatureType="Other" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="patrols">
+          <Card>
+            <CardContent className="pt-6">
+              <PatrolTable 
+                patrols={filteredPatrolEntries} 
+                loading={loadingPatrols}
+                onView={handleViewPatrol}
+                onEdit={handleEditPatrol}
+                onDelete={handleDeletePatrolClick}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -750,6 +954,138 @@ const Surveys = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Patrol View Modal */}
+      <Dialog open={viewPatrolModalOpen} onOpenChange={setViewPatrolModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Patrol Details</DialogTitle>
+            <DialogDescription>
+              Patrol #{selectedPatrol?.id}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedPatrol && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Start Time</p>
+                  <p className="font-medium">
+                    {formatDateTime(selectedPatrol.start_time)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">End Time</p>
+                  <p className="font-medium">
+                    {selectedPatrol.end_time ? formatDateTime(selectedPatrol.end_time) : 'Ongoing'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Observer</p>
+                  <p className="font-medium">{selectedPatrol.observer_name}</p>
+                  <Badge
+                    variant="outline"
+                    className={`mt-1 ${
+                      selectedPatrol.role?.toLowerCase() === 'farmer'
+                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                        : selectedPatrol.role?.toLowerCase() === 'staff'
+                        ? 'bg-green-100 text-green-800 border-green-200'
+                        : selectedPatrol.role?.toLowerCase() === 'ranger'
+                        ? 'bg-blue-100 text-blue-800 border-blue-200'
+                        : selectedPatrol.role?.toLowerCase() === 'officer'
+                        ? 'bg-purple-100 text-purple-800 border-purple-200'
+                        : selectedPatrol.role?.toLowerCase() === 'admin'
+                        ? 'bg-red-100 text-red-800 border-red-200'
+                        : 'bg-gray-100 text-gray-800 border-gray-200'
+                    }`}
+                  >
+                    {selectedPatrol.role}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <Badge 
+                    variant={selectedPatrol.status === 'active' ? 'default' : 'secondary'}
+                    className="mt-1"
+                  >
+                    {selectedPatrol.status}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Location Entries</p>
+                  <p className="font-medium text-2xl">
+                    {selectedPatrol.location_count}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Created At</p>
+                  <p className="font-medium">
+                    {formatDateTime(selectedPatrol.created_at)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Patrol Edit Modal */}
+      <Dialog open={editPatrolModalOpen} onOpenChange={setEditPatrolModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Patrol</DialogTitle>
+            <DialogDescription>
+              Patrol #{selectedPatrol?.id}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedPatrol && <EditPatrolForm patrol={selectedPatrol} onSave={handleUpdatePatrol} onCancel={() => setEditPatrolModalOpen(false)} />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Patrol Delete Confirmation Dialog */}
+      <Dialog open={deletePatrolDialogOpen} onOpenChange={setDeletePatrolDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Patrol Entry</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this patrol entry? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedPatrol && (
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm">
+                  <span className="font-semibold">Patrol #:</span> {selectedPatrol.id}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Observer:</span> {selectedPatrol.observer_name}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Status:</span> {selectedPatrol.status}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Start Time:</span> {formatDateTime(selectedPatrol.start_time)}
+                </p>
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeletePatrolDialogOpen(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeletePatrolConfirm}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete Patrol'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -936,6 +1272,223 @@ const EditForm = ({
           </div>
         </>
       )}
+
+      <div className="flex justify-end gap-3">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">
+          Save Changes
+        </Button>
+      </div>
+    </form>
+  );
+};
+
+// Patrol Table Component
+const PatrolTable = ({ 
+  patrols, 
+  loading,
+  onView,
+  onEdit,
+  onDelete
+}: { 
+  patrols: PatrolEntry[]; 
+  loading: boolean;
+  onView: (patrol: PatrolEntry) => void;
+  onEdit: (patrol: PatrolEntry) => void;
+  onDelete: (patrol: PatrolEntry) => void;
+}) => {
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <p className="text-muted-foreground">Loading patrol entries...</p>
+      </div>
+    );
+  }
+
+  if (patrols.length === 0) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <p className="text-muted-foreground">No patrol entries found</p>
+      </div>
+    );
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Start Time</TableHead>
+          <TableHead>End Time</TableHead>
+          <TableHead>Observer Name</TableHead>
+          <TableHead>Role</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Location Count</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {patrols.map((patrol) => (
+          <TableRow key={patrol.id}>
+            <TableCell>
+              <div className="flex items-center gap-1 text-sm whitespace-nowrap">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                {formatDateTime(patrol.start_time)}
+              </div>
+            </TableCell>
+            <TableCell>
+              <div className="flex items-center gap-1 text-sm whitespace-nowrap">
+                {patrol.end_time ? (
+                  <>
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    {formatDateTime(patrol.end_time)}
+                  </>
+                ) : (
+                  <Badge variant="outline">Ongoing</Badge>
+                )}
+              </div>
+            </TableCell>
+            <TableCell>
+              <div className="flex items-center gap-1">
+                <User className="w-4 h-4 text-muted-foreground" />
+                {patrol.observer_name}
+              </div>
+            </TableCell>
+            <TableCell>
+              <Badge
+                variant="outline"
+                className={`${
+                  patrol.role?.toLowerCase() === 'farmer'
+                    ? 'bg-amber-100 text-amber-800 border-amber-200'
+                    : patrol.role?.toLowerCase() === 'staff'
+                    ? 'bg-green-100 text-green-800 border-green-200'
+                    : patrol.role?.toLowerCase() === 'ranger'
+                    ? 'bg-blue-100 text-blue-800 border-blue-200'
+                    : patrol.role?.toLowerCase() === 'officer'
+                    ? 'bg-purple-100 text-purple-800 border-purple-200'
+                    : patrol.role?.toLowerCase() === 'admin'
+                    ? 'bg-red-100 text-red-800 border-red-200'
+                    : 'bg-gray-100 text-gray-800 border-gray-200'
+                }`}
+              >
+                {patrol.role}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <Badge 
+                variant={patrol.status === 'active' ? 'default' : 'secondary'}
+              >
+                {patrol.status}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-center">
+              <Badge variant="outline">{patrol.location_count}</Badge>
+            </TableCell>
+            <TableCell>
+              <div className="flex gap-2">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => onView(patrol)}
+                >
+                  <Eye className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => onEdit(patrol)}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => onDelete(patrol)}
+                >
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </Button>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+};
+
+// Edit Patrol Form Component
+const EditPatrolForm = ({ 
+  patrol, 
+  onSave, 
+  onCancel 
+}: { 
+  patrol: PatrolEntry; 
+  onSave: (data: Partial<PatrolEntry>) => void; 
+  onCancel: () => void;
+}) => {
+  const [formData, setFormData] = useState({
+    start_time: patrol.start_time,
+    end_time: patrol.end_time || '',
+    status: patrol.status,
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      ...formData,
+      end_time: formData.end_time || null,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 gap-4">
+        <div>
+          <label className="text-sm font-medium">Start Time</label>
+          <Input
+            type="datetime-local"
+            value={formData.start_time ? new Date(formData.start_time).toISOString().slice(0, 16) : ''}
+            onChange={(e) => setFormData({ ...formData, start_time: new Date(e.target.value).toISOString() })}
+            required
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">End Time</label>
+          <Input
+            type="datetime-local"
+            value={formData.end_time ? new Date(formData.end_time).toISOString().slice(0, 16) : ''}
+            onChange={(e) => setFormData({ ...formData, end_time: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Status</label>
+          <Select 
+            value={formData.status} 
+            onValueChange={(value) => setFormData({ ...formData, status: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
