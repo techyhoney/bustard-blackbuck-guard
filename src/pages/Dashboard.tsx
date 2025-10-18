@@ -1,19 +1,20 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bird, Users, FileText, TrendingUp, Calendar, Trees, AlertTriangle, UsersRound } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { Bird, Users, FileText, TrendingUp, Trees, AlertTriangle, UsersRound, MapPin, CalendarIcon, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import birdLogo from "@/images/bird.png";
 import animalLogo from "@/images/animal.png";
+import SurveyMap from "@/components/SurveyMap";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 interface DashboardStats {
   totalSurveyEntries: number;
@@ -32,6 +33,17 @@ interface DashboardStats {
   usersByRole: Record<string, number>;
   entriesByMonth: Array<{ month: string; count: number }>;
   lastUpdated: string;
+}
+
+interface MapLocation {
+  id: string;
+  latitude: number;
+  longitude: number;
+  location: string;
+  type: string;
+  creature?: string;
+  observer_name: string;
+  created_at: string;
 }
 
 const Dashboard = () => {
@@ -54,9 +66,13 @@ const Dashboard = () => {
     lastUpdated: new Date().toLocaleString('en-IN'),
   });
   const [loading, setLoading] = useState(true);
+  const [mapLocations, setMapLocations] = useState<MapLocation[]>([]);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     fetchDashboardStats();
+    fetchMapLocations();
   }, []);
 
   const fetchDashboardStats = async () => {
@@ -184,6 +200,198 @@ const Dashboard = () => {
     return last6Months;
   };
 
+  const fetchMapLocations = async () => {
+    try {
+      const allLocations: MapLocation[] = [];
+
+      // Helper function to parse coordinates from location string
+      const parseCoordinates = (locationStr: string): { lat: number; lng: number } | null => {
+        if (!locationStr) return null;
+        
+        // Try to parse comma-separated coordinates like "30.1703971, 71.4662297"
+        const parts = locationStr.split(',').map(p => p.trim());
+        if (parts.length === 2) {
+          const lat = parseFloat(parts[0]);
+          const lng = parseFloat(parts[1]);
+          
+          // Validate coordinates are numbers and in valid ranges
+          if (!isNaN(lat) && !isNaN(lng) && 
+              lat >= -90 && lat <= 90 && 
+              lng >= -180 && lng <= 180) {
+            return { lat, lng };
+          }
+        }
+        return null;
+      };
+
+      // Fetch from locations table (surveys) - this should be the primary source
+      console.log("Fetching locations from locations table...");
+      const { data: locationsData, error: locationsError } = await supabase
+        .from('locations')
+        .select(`
+          id,
+          location,
+          type,
+          creature,
+          created_at,
+          user_profile:user_id (
+            name_of_official
+          )
+        `);
+
+      console.log("Locations data:", locationsData);
+      console.log("Locations error:", locationsError);
+
+      if (locationsError) {
+        console.error("Error fetching locations:", locationsError);
+        toast.error("Error loading survey locations: " + locationsError.message);
+      } else if (locationsData) {
+        console.log(`Found ${locationsData.length} location entries`);
+        let validCount = 0;
+        let invalidCount = 0;
+        
+        locationsData.forEach((item: any) => {
+          const coords = parseCoordinates(item.location);
+          
+          if (coords) {
+            validCount++;
+            allLocations.push({
+              id: `location-${item.id}`,
+              latitude: coords.lat,
+              longitude: coords.lng,
+              location: item.location,
+              type: item.type || 'Survey',
+              creature: item.creature,
+              observer_name: item.user_profile?.name_of_official || 'Unknown',
+              created_at: item.created_at,
+            });
+          } else {
+            invalidCount++;
+            console.log("Skipping location - could not parse coordinates:", {
+              id: item.id,
+              location: item.location
+            });
+          }
+        });
+        
+        console.log(`Valid locations with coordinates: ${validCount}, Invalid: ${invalidCount}`);
+      }
+
+      // Fetch habitat assessments with coordinates
+      const { data: habitatData, error: habitatError } = await supabase
+        .from('habitat_assessments')
+        .select(`
+          id,
+          latitude,
+          longitude,
+          location,
+          habitat_type,
+          created_at,
+          user_profile:user_id (
+            name_of_official
+          )
+        `)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
+
+      if (!habitatError && habitatData) {
+        habitatData.forEach((item: any) => {
+          if (item.latitude && item.longitude) {
+            allLocations.push({
+              id: `habitat-${item.id}`,
+              latitude: parseFloat(item.latitude),
+              longitude: parseFloat(item.longitude),
+              location: item.location,
+              type: 'Habitat Assessment',
+              creature: item.habitat_type,
+              observer_name: item.user_profile?.name_of_official || 'Unknown',
+              created_at: item.created_at,
+            });
+          }
+        });
+      }
+
+      // Fetch threat documentations with coordinates
+      const { data: threatData, error: threatError } = await supabase
+        .from('threat_documentations')
+        .select(`
+          id,
+          latitude,
+          longitude,
+          location,
+          created_at,
+          user_profile:user_id (
+            name_of_official
+          )
+        `)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
+
+      if (!threatError && threatData) {
+        threatData.forEach((item: any) => {
+          if (item.latitude && item.longitude) {
+            allLocations.push({
+              id: `threat-${item.id}`,
+              latitude: parseFloat(item.latitude),
+              longitude: parseFloat(item.longitude),
+              location: item.location,
+              type: 'Threat Documentation',
+              observer_name: item.user_profile?.name_of_official || 'Unknown',
+              created_at: item.created_at,
+            });
+          }
+        });
+      }
+
+      // Fetch conservation interactions with coordinates
+      const { data: conservationData, error: conservationError } = await supabase
+        .from('conservation_community_interactions')
+        .select(`
+          id,
+          latitude,
+          longitude,
+          location,
+          created_at,
+          user_profile:user_id (
+            name_of_official
+          )
+        `)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
+
+      if (!conservationError && conservationData) {
+        conservationData.forEach((item: any) => {
+          if (item.latitude && item.longitude) {
+            allLocations.push({
+              id: `conservation-${item.id}`,
+              latitude: parseFloat(item.latitude),
+              longitude: parseFloat(item.longitude),
+              location: item.location,
+              type: 'Conservation Interaction',
+              observer_name: item.user_profile?.name_of_official || 'Unknown',
+              created_at: item.created_at,
+            });
+          }
+        });
+      }
+
+      console.log(`Total locations to display on map: ${allLocations.length}`);
+      setMapLocations(allLocations);
+    } catch (error: any) {
+      console.error("Error fetching map locations:", error);
+      toast.error("Failed to load map locations: " + error.message);
+    }
+  };
+
+  // Filter map locations by date
+  const filteredMapLocations = mapLocations.filter((location) => {
+    const locationDate = new Date(location.created_at);
+    const matchesDateFrom = !dateFrom || locationDate >= dateFrom;
+    const matchesDateTo = !dateTo || locationDate <= new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate(), 23, 59, 59);
+    
+    return matchesDateFrom && matchesDateTo;
+  });
+
   const statCards = [
     {
       title: "Total Survey Entries",
@@ -309,25 +517,93 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Charts */}
+      {/* Map and Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" />
-              Monthly Survey Trends (Last 6 Months)
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-primary" />
+                  Survey Locations Map
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Showing {filteredMapLocations.length} of {mapLocations.length} locations
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs">
+                    <CalendarIcon className="mr-2 h-3 w-3" />
+                    {dateFrom ? format(dateFrom, "MMM dd, yyyy") : "From date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[1000]" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={dateFrom}
+                    onSelect={setDateFrom}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs">
+                    <CalendarIcon className="mr-2 h-3 w-3" />
+                    {dateTo ? format(dateTo, "MMM dd, yyyy") : "To date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[1000]" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={dateTo}
+                    onSelect={setDateTo}
+                    disabled={(date) => dateFrom ? date < dateFrom : false}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              {(dateFrom || dateTo) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => {
+                    setDateFrom(undefined);
+                    setDateTo(undefined);
+                  }}
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={stats.entriesByMonth}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="relative z-0">
+              <SurveyMap locations={filteredMapLocations} height="400px" />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
+                <span className="text-xs">Great Indian Bustard</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+                <span className="text-xs">Blackbuck</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
+                <span className="text-xs">Other Species</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-gray-500 rounded-full"></div>
+                <span className="text-xs">Assessments</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
