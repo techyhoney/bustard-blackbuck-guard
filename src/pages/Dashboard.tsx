@@ -584,24 +584,29 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="relative z-0">
-              <SurveyMap locations={filteredMapLocations} height="400px" />
+              <SurveyMap 
+                locations={filteredMapLocations} 
+                height="400px" 
+                birdIcon={birdLogo}
+                animalIcon={animalLogo}
+              />
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
+                <div className="w-8 h-8 bg-white rounded-full border-2 border-blue-500 flex items-center justify-center p-1">
+                  <img src={birdLogo} alt="Bird" className="w-full h-full object-contain" />
+                </div>
                 <span className="text-xs">Great Indian Bustard</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+                <div className="w-8 h-8 bg-white rounded-full border-2 border-green-500 flex items-center justify-center p-1">
+                  <img src={animalLogo} alt="Animal" className="w-full h-full object-contain" />
+                </div>
                 <span className="text-xs">Blackbuck</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
                 <span className="text-xs">Other Species</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-gray-500 rounded-full"></div>
-                <span className="text-xs">Assessments</span>
               </div>
             </div>
           </CardContent>

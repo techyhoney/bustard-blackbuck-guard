@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { Icon } from 'leaflet';
+import { Icon, DivIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default marker icons in Leaflet with Vite
@@ -30,6 +30,8 @@ interface MapLocation {
 interface SurveyMapProps {
   locations: MapLocation[];
   height?: string;
+  birdIcon?: string;
+  animalIcon?: string;
 }
 
 // Component to fit bounds when locations change
@@ -46,7 +48,7 @@ const FitBounds = ({ locations }: { locations: MapLocation[] }) => {
   return null;
 };
 
-const SurveyMap = ({ locations, height = '500px' }: SurveyMapProps) => {
+const SurveyMap = ({ locations, height = '500px', birdIcon, animalIcon }: SurveyMapProps) => {
   const [center, setCenter] = useState<[number, number]>([20.5937, 78.9629]); // India center
 
   useEffect(() => {
@@ -59,21 +61,56 @@ const SurveyMap = ({ locations, height = '500px' }: SurveyMapProps) => {
   }, [locations]);
 
   // Create custom icons based on creature type
-  const getMarkerColor = (creature?: string) => {
+  const getMarkerIcon = (creature?: string) => {
+    let iconHtml = '';
+    
     switch (creature) {
       case 'Great Indian Bustard':
       case 'Bustard':
-        return '#3b82f6'; // blue
+        // Use bird image if provided, otherwise use default blue marker
+        if (birdIcon) {
+          iconHtml = `
+            <div style="background: white; border-radius: 50%; padding: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 2px solid #3b82f6;">
+              <img src="${birdIcon}" style="width: 28px; height: 28px; object-fit: contain;" />
+            </div>
+          `;
+          return new DivIcon({
+            html: iconHtml,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+            popupAnchor: [0, -20],
+            className: 'custom-marker-icon'
+          });
+        }
+        return createColorIcon('#3b82f6');
+      
       case 'Blackbuck':
-        return '#10b981'; // green
+        // Use animal image if provided, otherwise use default green marker
+        if (animalIcon) {
+          iconHtml = `
+            <div style="background: white; border-radius: 50%; padding: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 2px solid #10b981;">
+              <img src="${animalIcon}" style="width: 28px; height: 28px; object-fit: contain;" />
+            </div>
+          `;
+          return new DivIcon({
+            html: iconHtml,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+            popupAnchor: [0, -20],
+            className: 'custom-marker-icon'
+          });
+        }
+        return createColorIcon('#10b981');
+      
       case 'Other':
-        return '#8b5cf6'; // purple
+        return createColorIcon('#8b5cf6'); // purple
+      
       default:
-        return '#6b7280'; // gray
+        return createColorIcon('#6b7280'); // gray
     }
   };
 
-  const createCustomIcon = (color: string) => {
+  const createColorIcon = (color: string) => {
     const svgIcon = `
       <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
         <path fill="${color}" stroke="white" stroke-width="2" d="M12.5 0C5.596 0 0 5.596 0 12.5c0 9.375 12.5 28.125 12.5 28.125S25 21.875 25 12.5C25 5.596 19.404 0 12.5 0z"/>
@@ -126,7 +163,7 @@ const SurveyMap = ({ locations, height = '500px' }: SurveyMapProps) => {
           <Marker
             key={location.id}
             position={[location.latitude, location.longitude]}
-            icon={createCustomIcon(getMarkerColor(location.creature))}
+            icon={getMarkerIcon(location.creature)}
           >
             <Popup>
               <div className="space-y-1 min-w-[200px]">
