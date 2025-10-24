@@ -44,6 +44,7 @@ interface MapLocation {
   creature?: string;
   observer_name: string;
   created_at: string;
+  image_url?: string | null;
 }
 
 const Dashboard = () => {
@@ -69,6 +70,7 @@ const Dashboard = () => {
   const [mapLocations, setMapLocations] = useState<MapLocation[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [selectedSpecies, setSelectedSpecies] = useState<string[]>([]);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -234,6 +236,7 @@ const Dashboard = () => {
           type,
           creature,
           created_at,
+          image_url,
           user_profile:user_id (
             name_of_official
           )
@@ -250,11 +253,43 @@ const Dashboard = () => {
         let validCount = 0;
         let invalidCount = 0;
         
-        locationsData.forEach((item: any) => {
+        // Process locations with image URLs
+        for (const item of locationsData) {
           const coords = parseCoordinates(item.location);
           
           if (coords) {
             validCount++;
+            
+            // Generate signed URL for image if it exists
+            let imageUrl = null;
+            if (item.image_url) {
+              let fileName = item.image_url;
+
+              // If it's a full URL, extract the filename
+              if (item.image_url.startsWith('http://') || item.image_url.startsWith('https://')) {
+                const urlParts = item.image_url.split('/');
+                const sightingsIndex = urlParts.indexOf('sightings');
+                if (sightingsIndex !== -1 && urlParts.length > sightingsIndex + 1) {
+                  fileName = urlParts.slice(sightingsIndex + 1).join('/');
+                } else {
+                  fileName = urlParts[urlParts.length - 1];
+                }
+              } else {
+                fileName = item.image_url.split('/').pop() || item.image_url;
+              }
+
+              // Generate signed URL (valid for 1 hour)
+              const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                .from('sightings')
+                .createSignedUrl(fileName, 3600);
+
+              if (signedUrlError) {
+                console.error('Error creating signed URL:', signedUrlError);
+              } else if (signedUrlData) {
+                imageUrl = signedUrlData.signedUrl;
+              }
+            }
+            
             allLocations.push({
               id: `location-${item.id}`,
               latitude: coords.lat,
@@ -264,6 +299,7 @@ const Dashboard = () => {
               creature: item.creature,
               observer_name: item.user_profile?.name_of_official || 'Unknown',
               created_at: item.created_at,
+              image_url: imageUrl,
             });
           } else {
             invalidCount++;
@@ -272,7 +308,7 @@ const Dashboard = () => {
               location: item.location
             });
           }
-        });
+        }
         
         console.log(`Valid locations with coordinates: ${validCount}, Invalid: ${invalidCount}`);
       }
@@ -383,14 +419,34 @@ const Dashboard = () => {
     }
   };
 
-  // Filter map locations by date
+  // Filter map locations by date and species
   const filteredMapLocations = mapLocations.filter((location) => {
     const locationDate = new Date(location.created_at);
     const matchesDateFrom = !dateFrom || locationDate >= dateFrom;
     const matchesDateTo = !dateTo || locationDate <= new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate(), 23, 59, 59);
     
-    return matchesDateFrom && matchesDateTo;
+    // Species filter - if no species selected, show all
+    const matchesSpecies = selectedSpecies.length === 0 || 
+      selectedSpecies.includes(location.creature || '') || 
+      selectedSpecies.includes(location.type);
+    
+    return matchesDateFrom && matchesDateTo && matchesSpecies;
   });
+
+  // Get unique species/types for filter
+  const availableSpecies = Array.from(
+    new Set(
+      mapLocations.map(loc => loc.creature || loc.type).filter(Boolean)
+    )
+  ).sort();
+
+  const toggleSpecies = (species: string) => {
+    setSelectedSpecies(prev => 
+      prev.includes(species) 
+        ? prev.filter(s => s !== species)
+        : [...prev, species]
+    );
+  };
 
   const statCards = [
     {
@@ -517,143 +573,165 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Map and Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-primary" />
-                  Survey Locations Map
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Showing {filteredMapLocations.length} of {mapLocations.length} locations
-                </p>
-              </div>
+      {/* Full Width Map */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-primary" />
+                Survey Locations Map
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Showing {filteredMapLocations.length} of {mapLocations.length} locations
+              </p>
             </div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 text-xs">
-                    <CalendarIcon className="mr-2 h-3 w-3" />
-                    {dateFrom ? format(dateFrom, "MMM dd, yyyy") : "From date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[1000]" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={dateFrom}
-                    onSelect={setDateFrom}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 text-xs">
-                    <CalendarIcon className="mr-2 h-3 w-3" />
-                    {dateTo ? format(dateTo, "MMM dd, yyyy") : "To date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[1000]" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={dateTo}
-                    onSelect={setDateTo}
-                    disabled={(date) => dateFrom ? date < dateFrom : false}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              {(dateFrom || dateTo) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8"
-                  onClick={() => {
-                    setDateFrom(undefined);
-                    setDateTo(undefined);
-                  }}
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Clear
+          </div>
+          
+          {/* Date Filters */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs">
+                  <CalendarIcon className="mr-2 h-3 w-3" />
+                  {dateFrom ? format(dateFrom, "MMM dd, yyyy") : "From date"}
                 </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="relative z-0">
-              <SurveyMap 
-                locations={filteredMapLocations} 
-                height="400px" 
-                birdIcon={birdLogo}
-                animalIcon={animalLogo}
-              />
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-white rounded-full border-2 border-blue-500 flex items-center justify-center p-1">
-                  <img src={birdLogo} alt="Bird" className="w-full h-full object-contain" />
-                </div>
-                <span className="text-xs">Great Indian Bustard</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-white rounded-full border-2 border-green-500 flex items-center justify-center p-1">
-                  <img src={animalLogo} alt="Animal" className="w-full h-full object-contain" />
-                </div>
-                <span className="text-xs">Blackbuck</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
-                <span className="text-xs">Other Species</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>User Distribution by Role</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {Object.entries(stats.usersByRole)
-              .sort(([roleA], [roleB]) => roleA.localeCompare(roleB))
-              .map(([role, count]) => {
-                const roleColors: Record<string, { bg: string; border: string; text: string }> = {
-                  farmer: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
-                  staff: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
-                  ranger: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
-                  officer: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
-                  admin: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
-                };
-
-                const colors = roleColors[role.toLowerCase()] || { 
-                  bg: 'bg-gray-50', 
-                  border: 'border-gray-200', 
-                  text: 'text-gray-700' 
-                };
-
-                return (
-                  <div 
-                    key={role} 
-                    className={`flex justify-between items-center p-3 rounded-lg border ${colors.bg} ${colors.border}`}
-                  >
-                    <span className="text-sm font-medium capitalize">{role}</span>
-                    <span className={`text-lg font-bold ${colors.text}`}>
-                      {count}
-                    </span>
-                  </div>
-                );
-              })}
-            {Object.keys(stats.usersByRole).length === 0 && (
-              <div className="text-center text-muted-foreground py-4">
-                No users found
-              </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-[1000]" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={dateFrom}
+                  onSelect={setDateFrom}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs">
+                  <CalendarIcon className="mr-2 h-3 w-3" />
+                  {dateTo ? format(dateTo, "MMM dd, yyyy") : "To date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-[1000]" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={dateTo}
+                  onSelect={setDateTo}
+                  disabled={(date) => dateFrom ? date < dateFrom : false}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            {(dateFrom || dateTo || selectedSpecies.length > 0) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={() => {
+                  setDateFrom(undefined);
+                  setDateTo(undefined);
+                  setSelectedSpecies([]);
+                }}
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear All
+              </Button>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+
+          {/* Species Filter */}
+          <div className="mt-3">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Filter by Species/Type:</p>
+            <div className="flex flex-wrap gap-2">
+              {availableSpecies.map((species) => (
+                <Badge
+                  key={species}
+                  variant={selectedSpecies.includes(species) ? "default" : "outline"}
+                  className="cursor-pointer hover:bg-primary/80 transition-colors"
+                  onClick={() => toggleSpecies(species)}
+                >
+                  {species}
+                  {selectedSpecies.includes(species) && (
+                    <X className="ml-1 h-3 w-3" />
+                  )}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="relative z-0">
+            <SurveyMap 
+              locations={filteredMapLocations} 
+              height="600px" 
+              birdIcon={birdLogo}
+              animalIcon={animalLogo}
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-white rounded-full border-2 border-blue-500 flex items-center justify-center p-1">
+                <img src={birdLogo} alt="Bird" className="w-full h-full object-contain" />
+              </div>
+              <span className="text-xs">Great Indian Bustard</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-white rounded-full border-2 border-green-500 flex items-center justify-center p-1">
+                <img src={animalLogo} alt="Animal" className="w-full h-full object-contain" />
+              </div>
+              <span className="text-xs">Blackbuck</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
+              <span className="text-xs">Other Species</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* User Distribution */}
+      <Card>
+        <CardHeader>
+          <CardTitle>User Distribution by Role</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {Object.entries(stats.usersByRole)
+            .sort(([roleA], [roleB]) => roleA.localeCompare(roleB))
+            .map(([role, count]) => {
+              const roleColors: Record<string, { bg: string; border: string; text: string }> = {
+                farmer: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
+                staff: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
+                ranger: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
+                officer: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
+                admin: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
+              };
+
+              const colors = roleColors[role.toLowerCase()] || { 
+                bg: 'bg-gray-50', 
+                border: 'border-gray-200', 
+                text: 'text-gray-700' 
+              };
+
+              return (
+                <div 
+                  key={role} 
+                  className={`flex justify-between items-center p-3 rounded-lg border ${colors.bg} ${colors.border}`}
+                >
+                  <span className="text-sm font-medium capitalize">{role}</span>
+                  <span className={`text-lg font-bold ${colors.text}`}>
+                    {count}
+                  </span>
+                </div>
+              );
+            })}
+          {Object.keys(stats.usersByRole).length === 0 && (
+            <div className="text-center text-muted-foreground py-4">
+              No users found
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* System Information */}
       <Card>

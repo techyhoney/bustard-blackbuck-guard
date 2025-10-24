@@ -25,6 +25,7 @@ interface MapLocation {
   creature?: string;
   observer_name: string;
   created_at: string;
+  image_url?: string | null;
 }
 
 interface SurveyMapProps {
@@ -165,11 +166,27 @@ const SurveyMap = ({ locations, height = '500px', birdIcon, animalIcon }: Survey
             position={[location.latitude, location.longitude]}
             icon={getMarkerIcon(location.creature)}
           >
-            <Popup>
-              <div className="space-y-1 min-w-[200px]">
+            <Popup maxWidth={300}>
+              <div className="space-y-2 min-w-[200px]">
                 <div className="font-semibold text-base border-b pb-1">
                   {location.creature || location.type}
                 </div>
+                
+                {/* Display image if available */}
+                {location.image_url && (
+                  <div className="my-2">
+                    <img 
+                      src={location.image_url} 
+                      alt={location.creature || location.type}
+                      className="w-full h-40 object-cover rounded-md border border-gray-200"
+                      onError={(e) => {
+                        console.error('Failed to load image:', location.image_url);
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                
                 <div className="text-sm">
                   <span className="font-medium">Location:</span> {location.location}
                 </div>
