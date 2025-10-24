@@ -89,6 +89,8 @@ const Surveys = () => {
   const [deletePatrolDialogOpen, setDeletePatrolDialogOpen] = useState(false);
   const [patrolEntries, setPatrolEntries] = useState<PatrolEntry[]>([]);
   const [loadingPatrols, setLoadingPatrols] = useState(true);
+  const [patrolLocations, setPatrolLocations] = useState<SurveyEntry[]>([]);
+  const [loadingPatrolLocations, setLoadingPatrolLocations] = useState(false);
 
   // Fetch survey entries from Supabase
   useEffect(() => {
@@ -249,6 +251,92 @@ const Surveys = () => {
     }
   };
 
+  const fetchPatrolLocations = async (patrolId: string) => {
+    try {
+      setLoadingPatrolLocations(true);
+      
+      // Fetch locations associated with this patrol
+      const { data: locationsData, error: locationsError } = await supabase
+        .from('locations')
+        .select(`
+          *,
+          user_profile:user_id (
+            id,
+            name_of_official,
+            role
+          )
+        `)
+        .eq('patrol_id', patrolId)
+        .order('created_at', { ascending: false });
+
+      if (locationsError) {
+        console.error("Patrol locations fetch error:", locationsError);
+        toast.error("Failed to fetch patrol locations: " + locationsError.message);
+        return;
+      }
+
+      // Transform the data and generate signed URLs for images
+      const transformedData: SurveyEntry[] = await Promise.all(
+        (locationsData || []).map(async (location: any) => {
+          const userProfile = location.user_profile;
+          
+          // Generate signed URL for image if it exists
+          let imageUrl = null;
+          if (location.image_url) {
+            let fileName = location.image_url;
+
+            if (location.image_url.startsWith('http://') || location.image_url.startsWith('https://')) {
+              const urlParts = location.image_url.split('/');
+              const sightingsIndex = urlParts.indexOf('sightings');
+              if (sightingsIndex !== -1 && urlParts.length > sightingsIndex + 1) {
+                fileName = urlParts.slice(sightingsIndex + 1).join('/');
+              } else {
+                fileName = urlParts[urlParts.length - 1];
+              }
+            } else {
+              fileName = location.image_url.split('/').pop() || location.image_url;
+            }
+
+            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+              .from('sightings')
+              .createSignedUrl(fileName, 3600);
+
+            if (signedUrlError) {
+              console.error('Error creating signed URL:', signedUrlError);
+            } else if (signedUrlData) {
+              imageUrl = signedUrlData.signedUrl;
+            }
+          }
+          
+          return {
+            id: location.id,
+            created_at: location.created_at,
+            location: location.location,
+            observer_name: userProfile?.name_of_official || 'Unknown Observer',
+            role: userProfile?.role || 'Unknown Role',
+            type: location.type || 'Unknown Type',
+            number_of_birds_sighted: location.number_of_birds_sighted,
+            sex_age: location.sex_age,
+            behaviour_observed: location.behaviour_observed,
+            duration_of_observation: location.duration_of_observation,
+            bird_movement_direction: location.bird_movement_direction,
+            other_behaviour_details: location.other_behaviour_details,
+            creature: location.creature,
+            image_url: imageUrl,
+            patrol_id: location.patrol_id,
+          };
+        })
+      );
+
+      setPatrolLocations(transformedData);
+    } catch (error: any) {
+      toast.error("Failed to fetch patrol locations: " + error.message);
+      console.error("Error fetching patrol locations:", error);
+    } finally {
+      setLoadingPatrolLocations(false);
+    }
+  };
+
   const filteredEntries = surveyEntries.filter((entry) => {
     const matchesSearch =
       entry.observer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -385,6 +473,7 @@ const Surveys = () => {
   const handleViewPatrol = (patrol: PatrolEntry) => {
     setSelectedPatrol(patrol);
     setViewPatrolModalOpen(true);
+    fetchPatrolLocations(patrol.id);
   };
 
   const handleEditPatrol = (patrol: PatrolEntry) => {
@@ -957,7 +1046,7 @@ const Surveys = () => {
 
       {/* Patrol View Modal */}
       <Dialog open={viewPatrolModalOpen} onOpenChange={setViewPatrolModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Patrol Details</DialogTitle>
             <DialogDescription>
@@ -965,7 +1054,7 @@ const Surveys = () => {
             </DialogDescription>
           </DialogHeader>
           {selectedPatrol && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Start Time</p>
@@ -1022,6 +1111,77 @@ const Surveys = () => {
                     {formatDateTime(selectedPatrol.created_at)}
                   </p>
                 </div>
+              </div>
+
+              {/* Patrol Locations Section */}
+              <div className="border-t pt-4">
+                <h3 className="text-lg font-semibold mb-3">Survey Locations ({patrolLocations.length})</h3>
+                {loadingPatrolLocations ? (
+                  <p className="text-muted-foreground text-center py-4">Loading locations...</p>
+                ) : patrolLocations.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">No locations recorded for this patrol</p>
+                ) : (
+                  <div className="space-y-4">
+                    {patrolLocations.map((location) => (
+                      <Card key={location.id} className="border-l-4 border-l-primary">
+                        <CardContent className="pt-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <div>
+                                <p className="text-sm text-muted-foreground">Species</p>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="font-medium">
+                                    {location.creature}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">Location</p>
+                                <p className="font-medium text-sm">{location.location}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">Type</p>
+                                <p className="font-medium text-sm">{location.type}</p>
+                              </div>
+                              {location.number_of_birds_sighted && (
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Number Sighted</p>
+                                  <p className="font-medium text-sm">{location.number_of_birds_sighted}</p>
+                                </div>
+                              )}
+                              {location.behaviour_observed && location.behaviour_observed.length > 0 && (
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Behaviour</p>
+                                  <p className="font-medium text-sm">{location.behaviour_observed.join(', ')}</p>
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-sm text-muted-foreground">Recorded At</p>
+                                <p className="font-medium text-sm">{formatDateTime(location.created_at)}</p>
+                              </div>
+                            </div>
+                            
+                            {/* Show image if available */}
+                            {location.image_url && (
+                              <div>
+                                <p className="text-sm text-muted-foreground mb-2">Image</p>
+                                <img
+                                  src={location.image_url}
+                                  alt={location.creature}
+                                  className="w-full h-48 object-cover rounded-lg border"
+                                  onError={(e) => {
+                                    console.error('❌ Image failed to load:', location.image_url);
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
