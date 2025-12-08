@@ -131,23 +131,23 @@ const Users = () => {
     try {
       setDeleting(true);
 
-      // Delete user from auth
-      const { error: authError } = await supabase.auth.admin.deleteUser(selectedUser.id);
+      // Call the RPC function to delete user with profile
+      const { data, error } = await supabase.rpc('delete_user_with_profile', {
+        p_user_id: selectedUser.id
+      });
 
-      if (authError) {
-        console.error('Delete user error:', authError);
-        toast.error('Failed to delete user: ' + authError.message);
+      if (error) {
+        console.error('Delete user error:', error);
+        
+        // Handle specific error messages
+        if (error.message.includes('not_admin')) {
+          toast.error('You do not have permission to delete users. Admin access required.');
+        } else if (error.message.includes('cannot_delete_self')) {
+          toast.error('You cannot delete your own account.');
+        } else {
+          toast.error('Failed to delete user: ' + error.message);
+        }
         return;
-      }
-
-      // Delete user profile (this should cascade automatically if foreign key is set properly)
-      const { error: profileError } = await supabase
-        .from('user_profile')
-        .delete()
-        .eq('id', selectedUser.id);
-
-      if (profileError) {
-        console.error('Delete profile error:', profileError);
       }
 
       setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
@@ -497,7 +497,7 @@ const CreateUserForm = ({
     name: '',
     email: '',
     password: '',
-    role: 'Farmer',
+    role: 'farmer',
     employeeId: '',
     beatNumber: '',
     rangeForestOffice: '',
@@ -557,11 +557,9 @@ const CreateUserForm = ({
               <SelectValue placeholder="Select role" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Farmer">Farmer</SelectItem>
-              <SelectItem value="Staff">Staff</SelectItem>
-              <SelectItem value="Ranger">Ranger</SelectItem>
-              <SelectItem value="Officer">Officer</SelectItem>
-              <SelectItem value="Admin">Admin</SelectItem>
+              <SelectItem value="farmer">Farmer</SelectItem>
+              <SelectItem value="staff">Staff</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -706,11 +704,9 @@ const EditUserForm = ({
               <SelectValue placeholder="Select role" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Farmer">Farmer</SelectItem>
-              <SelectItem value="Staff">Staff</SelectItem>
-              <SelectItem value="Ranger">Ranger</SelectItem>
-              <SelectItem value="Officer">Officer</SelectItem>
-              <SelectItem value="Admin">Admin</SelectItem>
+              <SelectItem value="farmer">Farmer</SelectItem>
+              <SelectItem value="staff">Staff</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
         </div>

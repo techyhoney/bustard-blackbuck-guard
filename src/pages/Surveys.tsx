@@ -1414,9 +1414,13 @@ const EditForm = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="N">N (North)</SelectItem>
+                  <SelectItem value="NE">NE (Northeast)</SelectItem>
                   <SelectItem value="E">E (East)</SelectItem>
+                  <SelectItem value="SE">SE (Southeast)</SelectItem>
                   <SelectItem value="S">S (South)</SelectItem>
+                  <SelectItem value="SW">SW (Southwest)</SelectItem>
                   <SelectItem value="W">W (West)</SelectItem>
+                  <SelectItem value="NW">NW (Northwest)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
