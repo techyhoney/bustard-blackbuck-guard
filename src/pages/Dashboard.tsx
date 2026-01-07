@@ -64,7 +64,15 @@ const Dashboard = () => {
     activeAdmins: 0,
     usersByRole: {},
     entriesByMonth: [],
-    lastUpdated: new Date().toLocaleString('en-IN'),
+    lastUpdated: new Date().toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata', // IST timezone
+    }),
   });
   const [loading, setLoading] = useState(true);
   const [mapLocations, setMapLocations] = useState<MapLocation[]>([]);
@@ -170,6 +178,8 @@ const Dashboard = () => {
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Kolkata', // IST timezone
         }),
       };
 

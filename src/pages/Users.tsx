@@ -198,39 +198,29 @@ const Users = () => {
     if (!selectedUser) return;
 
     try {
-      // Update user email if changed
-      if (formData.email !== selectedUser.email) {
-        const { error: authError } = await supabase.auth.admin.updateUserById(
-          selectedUser.id,
-          { email: formData.email }
-        );
+      // Call the RPC function to update user with profile
+      const { data, error } = await supabase.rpc('update_user_with_profile', {
+        p_user_id: selectedUser.id,
+        p_email: formData.email,
+        p_name_of_official: formData.name,
+        p_role: formData.role,
+        p_employee_id: formData.employeeId || null,
+        p_beat_number: formData.beatNumber ? parseInt(formData.beatNumber) : null,
+        p_range_forest_office: formData.rangeForestOffice || null,
+        p_division: formData.division || null,
+        p_latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+        p_longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+      });
 
-        if (authError) {
-          console.error('Update email error:', authError);
-          toast.error('Failed to update email: ' + authError.message);
-          return;
+      if (error) {
+        console.error('Update user error:', error);
+        
+        // Handle specific error messages
+        if (error.message.includes('not_admin')) {
+          toast.error('You do not have permission to update users. Admin access required.');
+        } else {
+          toast.error('Failed to update user: ' + error.message);
         }
-      }
-
-      // Update user profile
-      const { error: profileError } = await supabase
-        .from('user_profile')
-        .update({
-          name_of_official: formData.name,
-          role: formData.role,
-          employee_id: formData.employeeId || null,
-          beat_number: formData.beatNumber ? parseInt(formData.beatNumber) : null,
-          range_forest_office: formData.rangeForestOffice || null,
-          division: formData.division || null,
-          latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-          longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-          last_update_date: new Date().toISOString(),
-        })
-        .eq('id', selectedUser.id);
-
-      if (profileError) {
-        console.error('Update profile error:', profileError);
-        toast.error('Failed to update profile: ' + profileError.message);
         return;
       }
 
@@ -267,6 +257,10 @@ const Users = () => {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata', // IST timezone
     });
   };
 
