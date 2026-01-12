@@ -35,6 +35,7 @@ import { Search, Eye, Edit, Trash2, MapPin, Calendar, User, CheckCircle, XCircle
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { formatToIST } from "@/lib/utils";
 
 interface ConservationInteraction {
   id: string;
@@ -223,16 +224,7 @@ const ConservationCommunityInteractions = () => {
   };
 
   const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata', // IST timezone
-    });
+    return formatToIST(dateString, true);
   };
 
   const InteractionTable = () => {

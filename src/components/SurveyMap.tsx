@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Icon, DivIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { formatToIST } from '@/lib/utils';
 
 // Fix for default marker icons in Leaflet with Vite
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -127,15 +128,7 @@ const SurveyMap = ({ locations, height = '500px', birdIcon, animalIcon }: Survey
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata', // IST timezone
-    });
+    return formatToIST(dateString, true);
   };
 
   if (locations.length === 0) {

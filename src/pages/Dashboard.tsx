@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import { formatToIST } from "@/lib/utils";
 
 interface DashboardStats {
   totalSurveyEntries: number;
@@ -64,15 +65,7 @@ const Dashboard = () => {
     activeAdmins: 0,
     usersByRole: {},
     entriesByMonth: [],
-    lastUpdated: new Date().toLocaleString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata', // IST timezone
-    }),
+    lastUpdated: formatToIST(new Date().toISOString(), true),
   });
   const [loading, setLoading] = useState(true);
   const [mapLocations, setMapLocations] = useState<MapLocation[]>([]);
@@ -172,15 +165,7 @@ const Dashboard = () => {
         activeAdmins: usersByRole['admin'] || 0,
         usersByRole: usersByRole,
         entriesByMonth: monthlyData,
-        lastUpdated: new Date().toLocaleString('en-IN', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-          timeZone: 'Asia/Kolkata', // IST timezone
-        }),
+        lastUpdated: formatToIST(new Date().toISOString(), true),
       };
 
       console.log("Final stats:", statsData); // Debug log

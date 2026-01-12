@@ -30,6 +30,7 @@ import {
 import { Search, Plus, Edit, Trash2, Mail, Shield, User as UserIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { formatToIST } from "@/lib/utils";
 
 interface User {
   id: string;
@@ -252,16 +253,7 @@ const Users = () => {
   };
 
   const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata', // IST timezone
-    });
+    return formatToIST(dateString, true);
   };
 
   return (

@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import birdLogo from "@/images/bird.png";
 import animalLogo from "@/images/animal.png";
 import { format } from "date-fns";
+import { formatToIST, formatISTDateTime, istStringToInput, inputToISTString } from "@/lib/utils";
 
 interface SurveyEntry {
   id: number;
@@ -560,16 +561,12 @@ const Surveys = () => {
   };
 
   const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata', // IST timezone
-    });
+    return formatToIST(dateString, true);
+  };
+
+  // For patrol times that are already stored in IST in the database
+  const formatPatrolTime = (dateString: string) => {
+    return formatISTDateTime(dateString);
   };
 
   const getRoleBadgeVariant = (role: string) => {
@@ -1061,13 +1058,13 @@ const Surveys = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Start Time</p>
                   <p className="font-medium">
-                    {formatDateTime(selectedPatrol.start_time)}
+                    {formatPatrolTime(selectedPatrol.start_time)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">End Time</p>
                   <p className="font-medium">
-                    {selectedPatrol.end_time ? formatDateTime(selectedPatrol.end_time) : 'Ongoing'}
+                    {selectedPatrol.end_time ? formatPatrolTime(selectedPatrol.end_time) : 'Ongoing'}
                   </p>
                 </div>
                 <div>
@@ -1225,7 +1222,7 @@ const Surveys = () => {
                   <span className="font-semibold">Status:</span> {selectedPatrol.status}
                 </p>
                 <p className="text-sm">
-                  <span className="font-semibold">Start Time:</span> {formatDateTime(selectedPatrol.start_time)}
+                  <span className="font-semibold">Start Time:</span> {formatPatrolTime(selectedPatrol.start_time)}
                 </p>
               </div>
             )}
@@ -1465,17 +1462,9 @@ const PatrolTable = ({
   onEdit: (patrol: PatrolEntry) => void;
   onDelete: (patrol: PatrolEntry) => void;
 }) => {
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata', // IST timezone
-    });
+  // For patrol times that are already stored in IST in the database
+  const formatPatrolTime = (dateString: string) => {
+    return formatISTDateTime(dateString);
   };
 
   if (loading) {
@@ -1513,7 +1502,7 @@ const PatrolTable = ({
             <TableCell>
               <div className="flex items-center gap-1 text-sm whitespace-nowrap">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
-                {formatDateTime(patrol.start_time)}
+                {formatPatrolTime(patrol.start_time)}
               </div>
             </TableCell>
             <TableCell>
@@ -1521,7 +1510,7 @@ const PatrolTable = ({
                 {patrol.end_time ? (
                   <>
                     <Calendar className="w-4 h-4 text-muted-foreground" />
-                    {formatDateTime(patrol.end_time)}
+                    {formatPatrolTime(patrol.end_time)}
                   </>
                 ) : (
                   <Badge variant="outline">Ongoing</Badge>
@@ -1624,20 +1613,20 @@ const EditPatrolForm = ({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4">
         <div>
-          <label className="text-sm font-medium">Start Time</label>
+          <label className="text-sm font-medium">Start Time (IST)</label>
           <Input
             type="datetime-local"
-            value={formData.start_time ? new Date(formData.start_time).toISOString().slice(0, 16) : ''}
-            onChange={(e) => setFormData({ ...formData, start_time: new Date(e.target.value).toISOString() })}
+            value={istStringToInput(formData.start_time)}
+            onChange={(e) => setFormData({ ...formData, start_time: inputToISTString(e.target.value) })}
             required
           />
         </div>
         <div>
-          <label className="text-sm font-medium">End Time</label>
+          <label className="text-sm font-medium">End Time (IST)</label>
           <Input
             type="datetime-local"
-            value={formData.end_time ? new Date(formData.end_time).toISOString().slice(0, 16) : ''}
-            onChange={(e) => setFormData({ ...formData, end_time: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+            value={formData.end_time ? istStringToInput(formData.end_time) : ''}
+            onChange={(e) => setFormData({ ...formData, end_time: e.target.value ? inputToISTString(e.target.value) : '' })}
           />
         </div>
         <div>
