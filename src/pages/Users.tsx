@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,7 +28,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Search, Plus, Edit, Trash2, Mail, Shield, User as UserIcon } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Mail, Shield, User as UserIcon, Key } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { formatToIST } from "@/lib/utils";
@@ -57,6 +58,8 @@ const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -235,6 +238,48 @@ const Users = () => {
     }
   };
 
+  const handlePasswordChangeClick = (user: User) => {
+    setSelectedUser(user);
+    setPasswordDialogOpen(true);
+  };
+
+  const handlePasswordChange = async (newPassword: string) => {
+    if (!selectedUser) return;
+
+    try {
+      setChangingPassword(true);
+
+      const { data, error } = await supabase.rpc('change_user_password', {
+        p_user_id: selectedUser.id,
+        p_new_password: newPassword
+      });
+
+      if (error) {
+        console.error('Change password error:', error);
+        
+        if (error.message.includes('not_admin')) {
+          toast.error('You do not have permission to change passwords. Admin access required.');
+        } else if (error.message.includes('invalid_password')) {
+          toast.error('Password must be at least 6 characters long.');
+        } else if (error.message.includes('user_not_found')) {
+          toast.error('User not found.');
+        } else {
+          toast.error('Failed to change password: ' + error.message);
+        }
+        return;
+      }
+
+      toast.success('Password changed successfully');
+      setPasswordDialogOpen(false);
+      setSelectedUser(null);
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      toast.error('Failed to change password: ' + error.message);
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const getRoleBadgeClass = (role: string) => {
     switch (role.toLowerCase()) {
       case "farmer":
@@ -368,14 +413,24 @@ const Users = () => {
                           size="icon"
                           variant="ghost"
                           onClick={() => handleEdit(user)}
+                          title="Edit user"
                         >
                           <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handlePasswordChangeClick(user)}
+                          title="Change password"
+                        >
+                          <Key className="w-4 h-4 text-blue-600" />
                         </Button>
                         {user.role.toLowerCase() !== 'admin' && (
                           <Button
                             size="icon"
                             variant="ghost"
                             onClick={() => handleDeleteClick(user)}
+                            title="Delete user"
                           >
                             <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
@@ -467,6 +522,26 @@ const Users = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Password Change Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change User Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for this user. The password must be at least 6 characters long.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <PasswordChangeForm
+              user={selectedUser}
+              onSubmit={handlePasswordChange}
+              onCancel={() => setPasswordDialogOpen(false)}
+              isChanging={changingPassword}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -526,9 +601,8 @@ const CreateUserForm = ({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="password">Password *</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             value={formData.password}
             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
             placeholder="Enter password (min 6 characters)"
@@ -768,6 +842,92 @@ const EditUserForm = ({
           Cancel
         </Button>
         <Button type="submit">Update User</Button>
+      </DialogFooter>
+    </form>
+  );
+};
+
+// Password Change Form Component
+const PasswordChangeForm = ({
+  user,
+  onSubmit,
+  onCancel,
+  isChanging,
+}: {
+  user: User;
+  onSubmit: (password: string) => void;
+  onCancel: () => void;
+  isChanging: boolean;
+}) => {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    onSubmit(password);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="p-4 bg-muted rounded-lg">
+        <p className="text-sm">
+          <span className="font-semibold">User:</span> {user.name_of_official}
+        </p>
+        <p className="text-sm">
+          <span className="font-semibold">Email:</span> {user.email}
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="newPassword">New Password *</Label>
+        <PasswordInput
+          id="newPassword"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Enter new password (min 6 characters)"
+          required
+          minLength={6}
+          disabled={isChanging}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="confirmPassword">Confirm Password *</Label>
+        <PasswordInput
+          id="confirmPassword"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          placeholder="Confirm new password"
+          required
+          minLength={6}
+          disabled={isChanging}
+        />
+      </div>
+
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
+
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isChanging}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isChanging}>
+          {isChanging ? 'Changing Password...' : 'Change Password'}
+        </Button>
       </DialogFooter>
     </form>
   );
